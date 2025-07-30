@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/your-repo-name/', // Replace with your actual repository name
+  base: '/text-audio/',
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
