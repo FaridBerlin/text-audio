@@ -1,9 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
 import { downloadBlob, convertToMp3 } from './utils/audioConverter'
-import { listVoices, synthesizeSpeech, type Voice, type VoiceId } from './utils/tts'
+import { listVoices, synthesizeSpeech, type ModelLoadProgress, type Voice, type VoiceId } from './utils/tts'
 import './App.css'
 
-const DEFAULT_VOICE_ID: VoiceId = 'en_US-hfc_female-medium'
+const DEFAULT_VOICE_ID: VoiceId = 'af_heart'
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  'en-us': 'English (US)',
+  'en-gb': 'English (UK)',
+  ja: 'Japanese',
+  zh: 'Mandarin Chinese',
+  es: 'Spanish',
+  fr: 'French',
+  hi: 'Hindi',
+  it: 'Italian',
+  'pt-br': 'Portuguese (Brazil)',
+}
+
+const progressPercent = (progress: ModelLoadProgress): number | null =>
+  progress.loaded != null && progress.total ? Math.round((progress.loaded * 100) / progress.total) : null
 
 function App() {
   const [text, setText] = useState('')
@@ -20,17 +35,18 @@ function App() {
   const [isConvertingMp3, setIsConvertingMp3] = useState(false)
 
   useEffect(() => {
-    listVoices()
+    listVoices((p) => setProgress(progressPercent(p)))
       .then((available) => {
         setVoices(available)
-        if (!available.some((voice) => voice.key === DEFAULT_VOICE_ID) && available.length > 0) {
-          setVoiceId(available[0].key)
+        if (!available.some((voice) => voice.id === DEFAULT_VOICE_ID) && available.length > 0) {
+          setVoiceId(available[0].id)
         }
       })
       .catch((err: unknown) => {
         console.error('Failed to load voice list:', err)
-        setVoicesError('Could not load the voice list. Check your internet connection and reload.')
+        setVoicesError('Could not load the Kokoro model. Check your internet connection and reload.')
       })
+      .finally(() => setProgress(null))
   }, [])
 
   // Revoke the previous object URL whenever it's replaced or the component unmounts.
@@ -43,7 +59,7 @@ function App() {
   const groupedVoices = useMemo(() => {
     const groups = new Map<string, Voice[]>()
     for (const voice of voices) {
-      const label = voice.language.name_english
+      const label = LANGUAGE_LABELS[voice.language] ?? voice.language
       if (!groups.has(label)) groups.set(label, [])
       groups.get(label)!.push(voice)
     }
@@ -61,9 +77,7 @@ function App() {
     setError(null)
 
     try {
-      const wavBlob = await synthesizeSpeech(text, voiceId, (p) => {
-        setProgress(Math.round((p.loaded * 100) / p.total))
-      })
+      const wavBlob = await synthesizeSpeech(text, voiceId, 1, (p) => setProgress(progressPercent(p)))
       setAudioBlob(wavBlob)
       setAudioUrl(URL.createObjectURL(wavBlob))
     } catch (err) {
@@ -125,8 +139,8 @@ function App() {
             {groupedVoices.map(([language, languageVoices]) => (
               <optgroup key={language} label={language}>
                 {languageVoices.map((voice) => (
-                  <option key={voice.key} value={voice.key}>
-                    {voice.name} ({voice.quality})
+                  <option key={voice.id} value={voice.id}>
+                    {voice.name} ({voice.gender}, grade {voice.overallGrade})
                   </option>
                 ))}
               </optgroup>
@@ -145,7 +159,11 @@ function App() {
               ? progress !== null
                 ? `Generating... ${progress}%`
                 : 'Generating...'
-              : 'Generate Speech'}
+              : voices.length === 0
+                ? progress !== null
+                  ? `Loading model... ${progress}%`
+                  : 'Loading model...'
+                : 'Generate Speech'}
           </button>
         </div>
 
@@ -172,8 +190,8 @@ function App() {
         <div className="info">
           <h3>About this app:</h3>
           <ul>
-            <li>Uses local, offline neural voices (Piper) running fully in your browser</li>
-            <li>The first generation with a given voice downloads its model, then it's cached for offline use</li>
+            <li>Uses the local, offline Kokoro-82M neural voice model running fully in your browser</li>
+            <li>The model downloads once on first load (~80MB), then is cached for offline use</li>
             <li>No text or audio is ever sent to a server</li>
             <li>Download the result as WAV or MP3</li>
           </ul>

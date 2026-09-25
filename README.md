@@ -5,8 +5,8 @@ A modern React + TypeScript application with **stunning dark mode design** that 
 ## ✨ Features
 
 - **🌙 Beautiful Dark Mode**: Modern dark theme with glassmorphism effects and neon accents
-- **🎙️ Local Neural Text-to-Speech**: Runs [Piper](https://github.com/rhasspy/piper) voices fully in your browser via WebAssembly + ONNX Runtime — no server, no API key
-- **🗣️ Voice Selection**: Over 100 voices across dozens of languages, downloaded on first use and cached for offline use
+- **🎙️ Local Neural Text-to-Speech**: Runs [Kokoro-82M](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX) fully in your browser via WebAssembly + ONNX Runtime — no server, no API key
+- **🗣️ Voice Selection**: Dozens of voices across multiple languages, part of a single model download cached for offline use
 - **📁 Real Audio Download**: Download the generated speech as an actual WAV file
 - **🎵 MP3 Conversion**: Convert the generated speech to true MP3 (128kbps) for maximum compatibility
 - **🔒 Fully Private**: Text and audio never leave your device — everything runs client-side
@@ -22,7 +22,7 @@ A modern React + TypeScript application with **stunning dark mode design** that 
 
 - **React 19 + TypeScript** - Modern, type-safe React with hooks
 - **Vite** - Fast build tool and development server
-- **[@diffusionstudio/vits-web](https://github.com/diffusionstudio/vits-web)** - Piper neural voices running in-browser via WebAssembly/ONNX Runtime
+- **[kokoro-js](https://github.com/hexgrad/kokoro)** - Kokoro-82M neural TTS running in-browser via WebAssembly/ONNX Runtime (transformers.js)
 - **@breezystack/lamejs** - Client-side MP3 encoding
 - **CSS3** - Modern dark mode design with glassmorphism
 - **GitHub Pages** - Static site deployment
@@ -54,8 +54,8 @@ A modern React + TypeScript application with **stunning dark mode design** that 
 ## Usage
 
 1. **Enter Text**: Type or paste the text you want to convert to speech in the text area
-2. **Select Voice**: Choose from over 100 local Piper voices in the dropdown menu
-3. **Generate**: Click "Generate Speech" — the voice model downloads on first use (a progress percentage is shown), then is cached in the browser for instant offline reuse
+2. **Select Voice**: Choose from the local Kokoro voices in the dropdown menu (grouped by language, graded by quality)
+3. **Generate**: Click "Generate Speech" — the model downloads on first use (a progress percentage is shown), then is cached in the browser for instant offline reuse
 4. **Preview**: Listen to the generated audio using the built-in player
 5. **Download Options**:
    - Download as WAV (the native output format)
@@ -63,9 +63,9 @@ A modern React + TypeScript application with **stunning dark mode design** that 
 
 ## Browser Compatibility
 
-- Requires WebAssembly and the Origin Private File System API (used to cache downloaded voice models)
+- Requires WebAssembly (WebGPU is used automatically when available for faster generation)
 - **Best Support**: Chrome, Chromium-based browsers (Edge, Brave, etc.), Firefox
-- **Note**: Very old browsers without WASM/OPFS support are not supported
+- **Note**: Very old browsers without WASM support are not supported
 
 ## Audio Formats
 
@@ -76,7 +76,7 @@ A modern React + TypeScript application with **stunning dark mode design** that 
 ## Limitations
 
 - Maximum text length is limited to 5000 characters
-- The first generation with a given voice requires downloading its model (a few MB to ~60MB depending on voice quality); an internet connection is needed for that one-time download
+- The first generation requires downloading the Kokoro model (~80MB, quantized); an internet connection is needed for that one-time download, after which it's cached for offline use
 - MP3 conversion may take a few seconds for longer audio
 
 ## Technical Details
@@ -87,9 +87,9 @@ Earlier versions of this app tried to "record" the browser's built-in `speechSyn
 
 ### Local Neural TTS
 
-Instead, this app uses [Piper](https://github.com/rhasspy/piper) voices running fully client-side via [@diffusionstudio/vits-web](https://github.com/diffusionstudio/vits-web) (ONNX Runtime + WebAssembly):
+Instead, this app uses [Kokoro-82M](https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX) running fully client-side via [kokoro-js](https://github.com/hexgrad/kokoro) (transformers.js, ONNX Runtime + WebAssembly/WebGPU):
 
-- Voice models are fetched once and cached in the Origin Private File System for offline reuse
+- The model is fetched once (quantized to `q8`) and cached by the browser for offline reuse
 - Inference produces a real, playable, downloadable WAV `Blob` directly — no capture hacks needed
 - The WAV can then be re-encoded to MP3 client-side with lamejs
 
