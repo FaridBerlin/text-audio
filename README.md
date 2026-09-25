@@ -31,7 +31,7 @@ A modern React + TypeScript application with **stunning dark mode design** that 
 
 ### Prerequisites
 
-- Node.js (version 14 or higher)
+- Node.js 20.19+ or 22.12+ (required by Vite 7)
 - Modern web browser (Chrome, Edge, Firefox, Safari)
 
 ### Installation
