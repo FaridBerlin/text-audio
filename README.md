@@ -1,17 +1,15 @@
 # Text to Audio Converter 🎧
 
-A modern React application with **stunning dark mode design** that converts text to speech and allows you to download the generated audio as a file.
+A modern React + TypeScript application with **stunning dark mode design** that converts text to speech entirely offline, in the browser, using local neural voices — and lets you download the result as a real WAV or MP3 file.
 
 ## ✨ Features
 
 - **🌙 Beautiful Dark Mode**: Modern dark theme with glassmorphism effects and neon accents
-- **🎙️ Text-to-Speech Conversion**: Uses the Web Speech API to convert any text to natural-sounding speech
-- **🗣️ Voice Selection**: Choose from available system voices in different languages
-- **⚙️ Customizable Speech**: Adjust speech rate and pitch for optimal results
-- **📁 Audio Download**: Download the generated speech as an audio file (WebM format)
-- **🎵 MP3 Conversion**: Convert any generated audio to MP3 format for maximum compatibility
-- **⏹️ Stop Control**: Stop speech generation at any time with the stop button
-- **🎯 Real TTS Audio**: Generate actual speech-like audio without microphone dependency
+- **🎙️ Local Neural Text-to-Speech**: Runs [Piper](https://github.com/rhasspy/piper) voices fully in your browser via WebAssembly + ONNX Runtime — no server, no API key
+- **🗣️ Voice Selection**: Over 100 voices across dozens of languages, downloaded on first use and cached for offline use
+- **📁 Real Audio Download**: Download the generated speech as an actual WAV file
+- **🎵 MP3 Conversion**: Convert the generated speech to true MP3 (128kbps) for maximum compatibility
+- **🔒 Fully Private**: Text and audio never leave your device — everything runs client-side
 - **📱 Responsive Design**: Works beautifully on desktop, tablet, and mobile devices
 - **🎨 Modern UI**: Glassmorphism effects, smooth animations, and gradient backgrounds
 - **🔊 Real-time Preview**: Listen to the generated audio before downloading
@@ -22,12 +20,10 @@ A modern React application with **stunning dark mode design** that converts text
 
 ## 🛠️ Technologies Used
 
-- **React 19** - Modern React with hooks
+- **React 19 + TypeScript** - Modern, type-safe React with hooks
 - **Vite** - Fast build tool and development server
-- **Web Speech API** - Browser text-to-speech
-- **MediaRecorder API** - Audio recording capabilities
+- **[@diffusionstudio/vits-web](https://github.com/diffusionstudio/vits-web)** - Piper neural voices running in-browser via WebAssembly/ONNX Runtime
 - **@breezystack/lamejs** - Client-side MP3 encoding
-- **ResponsiveVoice** - External TTS service integration
 - **CSS3** - Modern dark mode design with glassmorphism
 - **GitHub Pages** - Static site deployment
 
@@ -58,52 +54,44 @@ A modern React application with **stunning dark mode design** that converts text
 ## Usage
 
 1. **Enter Text**: Type or paste the text you want to convert to speech in the text area
-2. **Select Voice**: Choose from available voices in the dropdown menu
-3. **Adjust Settings**: Use the sliders to adjust speech rate (speed) and pitch
-4. **Convert**: Click "Convert to Audio" to generate the speech
-5. **Stop (Optional)**: Use "Stop Speech" button to cancel generation at any time
-6. **Preview**: Listen to the generated audio using the built-in player
-7. **Download Options**:
-   - Download in original format (WebM/WAV)
-   - Convert & Download as MP3 for maximum compatibility
+2. **Select Voice**: Choose from over 100 local Piper voices in the dropdown menu
+3. **Generate**: Click "Generate Speech" — the voice model downloads on first use (a progress percentage is shown), then is cached in the browser for instant offline reuse
+4. **Preview**: Listen to the generated audio using the built-in player
+5. **Download Options**:
+   - Download as WAV (the native output format)
+   - Download as MP3 (128kbps, converted client-side)
 
 ## Browser Compatibility
 
-- **Best Support**: Chrome, Chromium-based browsers (Edge, Brave, etc.)
-- **Good Support**: Firefox, Safari
-- **Note**: Some features may vary depending on the browser's implementation of Web APIs
+- Requires WebAssembly and the Origin Private File System API (used to cache downloaded voice models)
+- **Best Support**: Chrome, Chromium-based browsers (Edge, Brave, etc.), Firefox
+- **Note**: Very old browsers without WASM/OPFS support are not supported
 
 ## Audio Formats
 
-- **Original**: WebM format (most widely supported by browsers)
-- **MP3 Conversion**: True MP3 encoding using lamejs library
-- **High Quality**: 128kbps MP3 bitrate for good quality and file size balance
-- **Universal Compatibility**: MP3 files work on all devices and platforms
+- **Native Output**: WAV (uncompressed, generated directly by the TTS engine)
+- **MP3 Conversion**: True MP3 encoding using the lamejs library, 128kbps
+- **Universal Compatibility**: Both formats work on all devices and platforms
 
 ## Limitations
 
-- Audio quality depends on the browser's text-to-speech implementation
-- Voice availability varies by operating system and browser
 - Maximum text length is limited to 5000 characters
-- MP3 conversion may take a few seconds for longer audio files
+- The first generation with a given voice requires downloading its model (a few MB to ~60MB depending on voice quality); an internet connection is needed for that one-time download
+- MP3 conversion may take a few seconds for longer audio
 
 ## Technical Details
 
-### Web Speech API
+### Why not the Web Speech API?
 
-The application uses the browser's built-in Speech Synthesis API, which provides:
+Earlier versions of this app tried to "record" the browser's built-in `speechSynthesis` API to produce a downloadable file. This doesn't work: browsers do not expose synthesized speech as a capturable audio stream, so that approach could only ever capture silence, microphone noise, or synthetic tones — never the actual spoken text. This is a fundamental platform limitation, not a bug that can be patched.
 
-- Multiple voice options
-- Rate and pitch control
-- Cross-platform compatibility
+### Local Neural TTS
 
-### Audio Recording
+Instead, this app uses [Piper](https://github.com/rhasspy/piper) voices running fully client-side via [@diffusionstudio/vits-web](https://github.com/diffusionstudio/vits-web) (ONNX Runtime + WebAssembly):
 
-Uses MediaRecorder API to capture the synthesized speech:
-
-- Records in real-time as speech is generated
-- Supports various audio formats depending on browser
-- Automatically handles audio blob creation and download
+- Voice models are fetched once and cached in the Origin Private File System for offline reuse
+- Inference produces a real, playable, downloadable WAV `Blob` directly — no capture hacks needed
+- The WAV can then be re-encoded to MP3 client-side with lamejs
 
 ## 🚀 Deployment to GitHub Pages
 
@@ -114,7 +102,7 @@ This project is configured for easy deployment to GitHub Pages! See [DEPLOYMENT.
 1. **Update Configuration**:
 
    - Replace `yourusername` and `your-repo-name` in `package.json` homepage
-   - Update the `base` path in `vite.config.js` with your repository name
+   - Update the `base` path in `vite.config.ts` with your repository name
 
 2. **Push to GitHub**:
 
