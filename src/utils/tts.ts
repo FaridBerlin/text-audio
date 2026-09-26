@@ -9,10 +9,13 @@
  * (speechSynthesis), which browsers do not expose as a capturable audio
  * stream — that approach could only ever capture silence, microphone
  * noise, or synthetic beep tones, never the spoken text.
+ *
+ * The actual model loading and generation run in a Web Worker (see
+ * tts.worker.ts) so that synthesizing longer passages never blocks the
+ * main thread — otherwise the browser can show a "Page Unresponsive"
+ * prompt, or interrupt generation, especially on slower devices/networks.
  */
-import { KokoroTTS, type TextSplitterStream } from 'kokoro-js'
-
-const MODEL_ID = 'onnx-community/Kokoro-82M-v1.0-ONNX'
+import type { KokoroTTS } from 'kokoro-js'
 
 export type VoiceId = keyof InstanceType<typeof KokoroTTS>['voices']
 
@@ -33,33 +36,59 @@ export type ModelLoadProgress = {
   total?: number
 }
 
-let modelPromise: Promise<KokoroTTS> | null = null
+type WorkerResultPayload<T extends string> = T extends 'list-voices'
+  ? Voice[]
+  : { buffer: ArrayBuffer; mimeType: string }
 
-/**
- * Load the Kokoro model (once) and keep it cached for reuse. Downloads
- * the model weights on first use, then relies on the browser's HTTP
- * cache for subsequent offline use.
- */
-const loadModel = (onProgress?: (progress: ModelLoadProgress) => void): Promise<KokoroTTS> => {
-  if (!modelPromise) {
-    modelPromise = KokoroTTS.from_pretrained(MODEL_ID, {
-      dtype: 'q8',
-      progress_callback: onProgress,
-    })
+type WorkerResponse =
+  | { id: number; type: 'progress'; payload: ModelLoadProgress }
+  | { id: number; type: 'result'; payload: unknown }
+  | { id: number; type: 'error'; payload: string }
+
+let worker: Worker | null = null
+let nextRequestId = 0
+
+const getWorker = (): Worker => {
+  if (!worker) {
+    worker = new Worker(new URL('./tts.worker.ts', import.meta.url), { type: 'module' })
   }
-  return modelPromise
+  return worker
+}
+
+const callWorker = <T extends 'list-voices' | 'synthesize'>(
+  type: T,
+  payload: T extends 'synthesize' ? { text: string; voiceId: VoiceId; speed: number } : undefined,
+  onProgress?: (progress: ModelLoadProgress) => void,
+): Promise<WorkerResultPayload<T>> => {
+  return new Promise((resolve, reject) => {
+    const id = nextRequestId++
+    const w = getWorker()
+
+    const handleMessage = (event: MessageEvent<WorkerResponse>) => {
+      const message = event.data
+      if (message.id !== id) return
+
+      if (message.type === 'progress') {
+        onProgress?.(message.payload)
+        return
+      }
+
+      w.removeEventListener('message', handleMessage)
+      if (message.type === 'result') {
+        resolve(message.payload as WorkerResultPayload<T>)
+      } else {
+        reject(new Error(message.payload))
+      }
+    }
+
+    w.addEventListener('message', handleMessage)
+    w.postMessage({ id, type, payload })
+  })
 }
 
 /** All available voices. Triggers the (cached) model load if needed. */
-export const listVoices = async (
-  onProgress?: (progress: ModelLoadProgress) => void,
-): Promise<Voice[]> => {
-  const tts = await loadModel(onProgress)
-  return Object.entries(tts.voices).map(([id, voice]) => ({
-    id: id as VoiceId,
-    ...voice,
-  }))
-}
+export const listVoices = (onProgress?: (progress: ModelLoadProgress) => void): Promise<Voice[]> =>
+  callWorker('list-voices', undefined, onProgress)
 
 /**
  * Synthesize speech for the given text using a local Kokoro voice.
@@ -71,9 +100,6 @@ export const synthesizeSpeech = async (
   speed = 1,
   onProgress?: (progress: ModelLoadProgress) => void,
 ): Promise<Blob> => {
-  const tts = await loadModel(onProgress)
-  const audio = await tts.generate(text, { voice: voiceId, speed })
-  return audio.toBlob()
+  const { buffer, mimeType } = await callWorker('synthesize', { text, voiceId, speed }, onProgress)
+  return new Blob([buffer], { type: mimeType })
 }
-
-export type { TextSplitterStream }
